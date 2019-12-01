@@ -31,7 +31,7 @@
            closed #{}]
       (cond (is-goal? (peek open)) (peek open)
             (closed (peek open)) (recur (pop open) closed)
-            :else (recur (apply conj (pop open) (next-moves (peek open)))
+            :else (recur (into (pop open) (next-moves (peek open)))
                          (conj closed (peek open)))))))
 
 (defn schedule
@@ -47,7 +47,7 @@
   to a uniformly random number between 0 and 1.  If the value exceeds this
   random number, we switch.
 
-n  Example of how temperature impacts probability of switching, holding delta
+  Example of how temperature impacts probability of switching, holding delta
   constant:
 
     exp(-0.01) ~= 0.99  - almost certainly switch (likely > random(0,1)
