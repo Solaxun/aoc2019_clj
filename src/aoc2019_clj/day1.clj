@@ -1,4 +1,4 @@
-(ns aoc2019-clj.core
+(ns aoc2019-clj.day1
   (:require [clojure.string :as str]
             [clojure.math.combinatorics :as combs]
             [clojure.data.json :as json]
