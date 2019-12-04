@@ -1,4 +1,4 @@
-(ns aoc2019-clj.day2
+(ns aoc2019-clj.day3
   (:require [clojure.string :as str]
             [clojure.math.combinatorics :as combs]
             [clojure.data.json :as json]
@@ -64,12 +64,12 @@
 (def wiremap-a (zipmap (-> (reductions step-move [arbitrary-start []] wire1)
                            last
                            last)
-                       (range)))
+                       (iterate inc 1)))
 
 (def wiremap-b (zipmap (-> (reductions step-move [arbitrary-start []] wire2)
                            last
                            last)
-                       (range)))
+                       (iterate inc 1)))
 
 
 (sort (mapv (fn [isxn]
@@ -89,7 +89,7 @@
   (zipmap-firsts (-> (reductions step-move [arbitrary-start []] wirestring)
               last
               last)
-          (range)));; keep first not last
+          (iterate inc 1)))
 
 (def isects (clojure.set/intersection (-> (wiremap wirea1) keys set)
                                       (-> (wiremap wirea2) keys set)))
