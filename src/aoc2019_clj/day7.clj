@@ -38,7 +38,7 @@
 (defn interpret [instructions input1 input2]
   (let [called-n (atom 0)]
     (loop [i 0 instr instructions out :fail]
-      (println "pointer: " i "phase: " input1 "called-cnt: " @called-n)
+      #_(println "pointer: " i "phase: " input1 "called-cnt: " @called-n)
       (let [[op x y z & xs] (subvec instr i)]
         (when (< i (count instr))
           (case (get-op op)
@@ -58,9 +58,9 @@
              :let [[p1 p2 p3 p4 p5] (map #(partial interpret program %) p)]]
          (-> 0 p1 p2 p3 p4 p5)))
 
-(let [[p1 p2 p3 p4 p5] (map #(partial interpret program %) (range 5))]
-  (-> 0 p1 ))
-(interpret program 1 19)
+;; (let [[p1 p2 p3 p4 p5] (map #(partial interpret program %) (range 5))]
+;;   (-> 0 p1 ))
+;; (interpret program 1 19)
 
 ;; part 2 - need to not recurse until halt this time.  whenever an output is hit
 ;; pause execution, save state of program, and pass output to next in the chain
@@ -75,9 +75,10 @@
                      :instr instructions
                      :called-cnt 0
                      :out :fail})]
-    (fn [input]
+    (fn [{:keys [input halted?]}]
       (loop [{:keys [i instr called-cnt out]} @state]
-        (println "pointer: " i "phase: " phase (:called-cnt @state) )
+
+        #_(println "pointer: " i "phase: " phase "halted?: " halted?)
         (let [[op x y z & xs] (subvec instr i)]
           (when (< i (count instr))
             (case (get-op op)
@@ -92,8 +93,11 @@
                             :instr (assoc instr x (if (= 1 (@state :called-cnt)) phase input))
                             :out out}))
               ;; return output for next in chain and freeze state for resumption later
-              4 (do (swap! state merge {:i (+ i 2) :instr instr})
-                    (mode-get instr x (-> op get-modes first)))
+              4 (do (swap! state merge
+                           {:i (+ i 2)
+                            :instr instr
+                            :out {:halted? false :input (mode-get instr x (-> op get-modes first))}})
+                    (:out @state))
               5 (recur {:i (or ((jmp (partial not= 0))instr (map vector [x y] (get-modes op))) (+ i 3))
                         :instr instr
                         :out out})
@@ -106,13 +110,23 @@
               8 (recur {:i (+ i 4)
                         :instr (assoc instr z ((compare =) instr (map vector [x y] (get-modes op))))
                         :out out})
-              9 out)))))))
+              9 {:halted? true :output out})))))))
 
-(apply max
+#_(apply max
        (for [p (combs/permutations (range 5))
              :let [[p1 p2 p3 p4 p5] (map (partial interpret program) p)]]
-         (-> 0 p1 p2 p3 p4 p5 p1)))
+         (-> 0 p1 p2 p3 p4 p5)))
 ;; (let [[p1 p2 p3 p4 p5] (map (partial interpret program) (range 5))]
 ;;   (-> 0 p1 ))
 ;; ((interpret program 0) 2)
 ;; ((interpret program 1) 19)
+(apply max (map #(get-in % [:output :input])
+                (for [p #_[(range 5 10)] (combs/permutations (range 5 10))
+                      :let [programs (map (partial interpret program) p)]]
+                  (reduce (fn [input [amp-id next-amp]]
+                            (if (and (:halted? input)
+                                     (zero? (mod amp-id 5)))
+                              (do #_(println (reduced input)) (reduced input))
+                              (next-amp input)))
+                          {:halted? false :input 0}
+                          (cycle (map-indexed vector programs))))))
