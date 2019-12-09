@@ -39,7 +39,7 @@
 
 (defn get-modes [op]
   (let [opcode (get-op op)
-        nargs ({1 3 2 3 3 1 4 1 5 2 6 2 7 3 8 3 9 2} opcode)]
+        nargs ({1 3 2 3 3 1 4 1 5 2 6 2 7 3 8 3 9 1 99 1} opcode)]
     (reverse (concat (repeat (- nargs (count (drop-last 2 (str op)))) 0)
                      (->> op str (drop-last 2) (map #(-> % str read-string)))))))
 
@@ -51,7 +51,7 @@
 (defn process [instructions input]
   (loop [i 0 instr instructions base 0]
     (let [[op x y z & xs] (subvec instr i)]
-      (println i op x y base)
+      (println "i: " i "op: " op  "x: " x "y: " y "z: " z "base: " base)
      (when (< i (count instr))
       (case (get-op op)
         1 (recur (+ i 4) (assoc-safe instr z ((math + base) instr (map vector [x y] (get-modes op)))) base)
@@ -85,3 +85,4 @@
 #_(process [104,1125899906842624,99] 1)
 
 (process nums 1)
+#_(get-modes 209)
