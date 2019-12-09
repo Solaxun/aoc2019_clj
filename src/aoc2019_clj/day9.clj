@@ -62,7 +62,7 @@
         6 (recur (or ((jmp (partial = 0) base) instr (map vector [x y] (get-modes op))) (+ i 3)) instr base)
         7 (recur (+ i 4) (assoc-safe instr z ((compare < base) instr (map vector [x y] (get-modes op)))) base)
         8 (recur (+ i 4) (assoc-safe instr z ((compare = base) instr (map vector [x y] (get-modes op)))) base)
-        9 (recur (+ i 2) instr (+ base x))
+        9 (recur (+ i 2) instr (+ base (mode-get instr x (-> op get-modes first) base)))
         99 instr)))))
 
 
