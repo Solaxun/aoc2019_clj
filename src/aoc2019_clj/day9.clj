@@ -52,7 +52,7 @@
   (loop [i 0 instr instructions base 0]
     (let [[op x y z & xs] (subvec instr i)]
      (when (< i (count instr))
-      (case (get-op op)
+      (case (get-op code)
         1 (recur (+ i 4) ((assoc-safe base (-> op get-modes (nth 2))) instr z ((math + base) instr (map vector [x y] (get-modes op)))) base)
         2 (recur (+ i 4) ((assoc-safe base (-> op get-modes (nth 2))) instr z ((math * base) instr (map vector [x y] (get-modes op)))) base)
         3 (recur (+ i 2) ((assoc-safe base (-> op get-modes first)) instr x input) base)
