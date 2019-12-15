@@ -40,7 +40,7 @@
 (defn mem-get
   [{:keys [memory pointer base inputs-received halted? output]}
    k mode]
-  "println in memget"
+  (println "in memget")
   (case mode
     0 (get memory k 0)
     1 k
@@ -145,4 +145,5 @@
     7 (store-if-lt program (mem-get program x xmode) (mem-get program y ymode) z zmode)
     8 (store-if-eq program (mem-get program x xmode) (mem-get program y ymode) z zmode)
     9 (swap! program assoc :halted? true)))
-(mem-get program 10 0)
+
+(mult program (mem-get program 34463338 1) (mem-get program 34463338 1) 63 0)
