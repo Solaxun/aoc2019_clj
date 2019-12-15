@@ -26,7 +26,7 @@
 
 (defn get-modes [op]
   (let [opcode (get-op op)
-        nargs ({1 3 2 3 3 1 4 1 5 2 6 2 7 3 8 3} opcode)]
+        nargs ({1 3 2 3 3 1 4 1 5 2 6 2 7 3 8 3 99 0} opcode)]
     (reverse (concat (repeat (- nargs (count (drop-last 2 (str op)))) 0)
                      (->> op str (drop-last 2) (map #(-> % str read-string)))))))
 
@@ -72,10 +72,10 @@
                xmode)))
 
 (defn -send [program x]
-  (do (println x)
-      (-> program
-          (update :pointer + 2)
-          (update :output conj x))))
+  (println x)
+  (-> program
+      (update :pointer + 2)
+      (update :output conj x)))
 
 (defn jump-if-true [program x y]
   (update program :pointer #(if (not= 0 x) y (+ 3 %))))
@@ -102,7 +102,6 @@
     (when-not halted?
       (let [op (get-op (get memory pointer))
             [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
-        #_(println x xmode y ymode z zmode)
         (case op
           1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
           2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
@@ -112,13 +111,8 @@
           6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
           7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
           8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-          9 (swap! program assoc :halted? true))))))
+          99 (swap! program assoc :halted? true))))))
 
-(take-while
- (fn [program] (not (:halted? program)))
- (iterate (fn [program] (interpret program 5 5)) @program))
-;; ((interpret program 5) 5) ;; should be 5000972
-
-
-#_(swap! program jump-if-true 0 53)
-#_(interpret (interpret @program 5 5) 5 5)
+(some
+ (fn [program] (when (program :halted?) (program :output)))
+ (iterate (fn [program] (interpret program 1 1)) @program))
