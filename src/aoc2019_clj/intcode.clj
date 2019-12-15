@@ -5,7 +5,7 @@
             [clojure.java.io :as io]
             [aoc2019-clj.utils.utils :as utils]))
 
-(def input (slurp (io/resource "day5.txt")))
+(def input (slurp (io/resource "day9.txt")))
 
 (def program-init-state
   (-> input (str/split #",")
@@ -26,7 +26,7 @@
 
 (defn get-modes [op]
   (let [opcode (get-op op)
-        nargs ({1 3 2 3 3 1 4 1 5 2 6 2 7 3 8 3 99 0} opcode)]
+        nargs ({1 3 2 3 3 1 4 1 5 2 6 2 7 3 8 3 9 2 99 0} opcode)]
     (reverse (concat (repeat (- nargs (count (drop-last 2 (str op)))) 0)
                      (->> op str (drop-last 2) (map #(-> % str read-string)))))))
 
@@ -95,6 +95,12 @@
       (update :pointer + 4)
       (mem-set z (if (= x y) 1 0) zmode)))
 
+(defn adjust-base
+  [program x]
+  (-> program
+      (update :pointer + 2)
+      (update :base + x)))
+
 (defn interpret [prog phase input]
   (let [{:keys [memory pointer base inputs-received halted? output]} prog]
     #_(println "pointer: " pointer "phase: " phase "halted?: " halted?
@@ -111,8 +117,9 @@
           6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
           7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
           8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+          9 (swap! program adjust-base (mem-get prog x xmode))
           99 (swap! program assoc :halted? true))))))
 
 (some
  (fn [program] (when (program :halted?) (program :output)))
- (iterate (fn [program] (interpret program 1 1)) @program))
+ (iterate (fn [program] (interpret program 2 2)) @program))
