@@ -5,7 +5,7 @@
             [clojure.java.io :as io]
             [aoc2019-clj.utils.utils :as utils]))
 
-(def input (slurp (io/resource "day9.txt")))
+(def input (slurp (io/resource "day5.txt")))
 
 (def program-init-state
   (-> input (str/split #",")
@@ -30,120 +30,95 @@
     (reverse (concat (repeat (- nargs (count (drop-last 2 (str op)))) 0)
                      (->> op str (drop-last 2) (map #(-> % str read-string)))))))
 
-(defn arg-modes
-  [memory pointer]
+(defn arg-modes [memory pointer]
   (let [op (memory pointer)
         args (map (partial get memory)
                   (range (inc pointer) (+ 4 pointer)))]
     (map vector args (get-modes op))))
 
-(defn mem-get
-  [{:keys [memory pointer base inputs-received halted? output]}
-   k mode]
-  (println "in memget")
-  (case mode
-    0 (get memory k 0)
-    1 k
-    2 (get memory (+ k base) 0)))
+(defn mem-get [program k mode]
+  (let [memory (program :memory)
+        base (program :base)]
+    (case mode
+      0 (get memory k 0)
+      1 k
+      2 (get memory (+ k base) 0))))
 
-(defn mem-set
-  [{:keys [memory pointer base inputs-received halted? output]}
-   k v mode]
-  (let [k (case mode
+(defn mem-set [program k v mode]
+  (let [memory (:memory program)
+        base (:base program)
+        k (case mode
             0 k
-            2 (+ k base))])
-  (swap! program update :memory assoc k v))
+            2 (+ k base))]
+    (update program :memory assoc k v)))
 
-(defn add
-  [{:keys [memory pointer base inputs-received halted? output]}
-   x y z zmode]
-  (swap! program #(-> %
-                      (update :pointer + 4)
-                      (mem-set z (+ x y) zmode))))
+(defn add [program x y z zmode]
+  (-> program
+      (update :pointer + 4)
+      (mem-set z (+ x y) zmode)))
 
-(defn mult
-  [{:keys [memory pointer base inputs-received halted? output]}
-   x y z zmode]
-  "in mult"
-  (swap! program #(-> %
-                      (update :pointer + 4)
-                      (mem-set z (* x y) zmode))))
+(defn mult [program x y z zmode]
+  (-> program
+      (update :pointer + 4)
+      (mem-set z (* x y) zmode)))
 
-(defn receive
-  [{:keys [memory pointer base inputs-received halted? output]}
-   x xmode phase input]
-  (swap! program #(-> %
-                      (update :inputs-received inc)
-                      (update :pointer + 2)
-                      (mem-set x (if (= 1 inputs-received) phase input) xmode))))
+(defn receive [program x xmode phase input]
+  (-> program
+      (update :inputs-received inc)
+      (update :pointer + 2)
+      (mem-set x (if (= 1 (program :inputs-received))
+                   phase
+                   input)
+               xmode)))
 
-(defn -send
-  [{:keys [memory pointer base inputs-received halted? output]} x]
+(defn -send [program x]
   (do (println x)
-      (swap! program #(-> %
-                          (update :pointer + 2)
-                         (update :output conj x)))))
+      (-> program
+          (update :pointer + 2)
+          (update :output conj x))))
 
-(defn jump-if-true
-  [{:keys [memory pointer base inputs-received halted?]} x y]
-  (swap! program assoc :pointer (if (not= 0 x) y pointer)))
+(defn jump-if-true [program x y]
+  (update program :pointer #(if (not= 0 x) y (+ 3 %))))
 
-(defn jump-if-false
-  [{:keys [memory pointer base inputs-received halted?]} x y]
-  (swap! program assoc :pointer (if (zero? x) y pointer)))
+(defn jump-if-false [program x y]
+  (update program :pointer #(if (= 0 x) y (+ 3 %))))
 
 (defn store-if-lt
-  [{:keys [memory pointer base inputs-received halted?]} x y z zmode]
-  (swap! program #(-> %
-                      (update :pointer + 4)
-                      (mem-set z (if (< x y) 1 0) zmode))))
+  [program x y z zmode]
+  (-> program
+      (update :pointer + 4)
+      (mem-set z (if (< x y) 1 0) zmode)))
 
 (defn store-if-eq
-  [{:keys [memory pointer base inputs-received halted?]} x y z zmode]
-  (swap! #(-> %
-              (update :pointer + 4)
-              (mem-set z (if (= x y) 1 0) zmode))))
+  [program x y z zmode]
+  (-> program
+      (update :pointer + 4)
+      (mem-set z (if (= x y) 1 0) zmode)))
 
-(defn interpret [program phase input]
-  (let [{:keys [memory pointer base inputs-received halted? output]} @program]
-    (println "pointer: " pointer "phase: " phase "halted?: " halted?
+(defn interpret [prog phase input]
+  (let [{:keys [memory pointer base inputs-received halted? output]} prog]
+    #_(println "pointer: " pointer "phase: " phase "halted?: " halted?
              "op" (get-op (get memory pointer)) "argmodes" (arg-modes memory pointer))
     (when-not halted?
       (let [op (get-op (get memory pointer))
             [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
         #_(println x xmode y ymode z zmode)
         (case op
-          1 (add program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-          2 (mult program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-          3 (receive program x xmode phase input)
-          4 (-send program (mem-get program x xmode))
-          5 (jump-if-true program (mem-get program x xmode) (mem-get program y ymode))
-          6 (jump-if-true program (mem-get program x xmode) (mem-get program y ymode))
-          7 (store-if-lt program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-          8 (store-if-eq program (mem-get program x xmode) (mem-get program y ymode) z zmode)
+          1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+          2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+          3 (swap! program receive x xmode phase input)
+          4 (swap! program -send (mem-get prog x xmode))
+          5 (swap! program jump-if-true (mem-get prog x xmode) (mem-get prog y ymode))
+          6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
+          7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+          8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
           9 (swap! program assoc :halted? true))))))
 
-#_(take-while
+(take-while
  (fn [program] (not (:halted? program)))
- (iterate (fn [program] (interpret program 5 5)))
- program-init-state)
+ (iterate (fn [program] (interpret program 5 5)) @program))
 ;; ((interpret program 5) 5) ;; should be 5000972
 
-(interpret program 5 5)
-(let [phase 5 input 5
-      {:keys [memory pointer base inputs-received halted? output]} @program
-      op (get-op (get memory pointer))
-      [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
-  (println "code: " (get memory pointer) "op: " op "args/modes: " x xmode y ymode z zmode)
-  (case op
-    1 (add program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-    2 (mult program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-    3 (receive program x xmode phase input)
-    4 (-send program (mem-get program x xmode))
-    5 (jump-if-true program (mem-get program x xmode) (mem-get program y ymode))
-    6 (jump-if-true program (mem-get program x xmode) (mem-get program y ymode))
-    7 (store-if-lt program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-    8 (store-if-eq program (mem-get program x xmode) (mem-get program y ymode) z zmode)
-    9 (swap! program assoc :halted? true)))
 
-(mult program (mem-get program 34463338 1) (mem-get program 34463338 1) 63 0)
+#_(swap! program jump-if-true 0 53)
+#_(interpret (interpret @program 5 5) 5 5)
