@@ -11,13 +11,15 @@
   (-> input (str/split #",")
       ((partial mapv read-string))))
 
-(def program
-  (atom {:memory (into {} (map-indexed vector program-init-state))
+(defn make-program [instructions]
+  (atom {:memory (into {} (map-indexed vector instructions))
          :pointer 0
          :base 0
          :inputs-received 1
          :halted? false
          :output []}))
+
+(def program (make-program program-init-state))
 
 (defn get-op [op]
   (if (= 99 op)
@@ -101,25 +103,45 @@
       (update :pointer + 2)
       (update :base + x)))
 
-(defn interpret [prog phase input]
-  (let [{:keys [memory pointer base inputs-received halted? output]} prog]
-    #_(println "pointer: " pointer "phase: " phase "halted?: " halted?
-             "op" (get-op (get memory pointer)) "argmodes" (arg-modes memory pointer))
-    (when-not halted?
-      (let [op (get-op (get memory pointer))
-            [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
-        (case op
-          1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-          2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-          3 (swap! program receive x xmode phase input)
-          4 (swap! program -send (mem-get prog x xmode))
-          5 (swap! program jump-if-true (mem-get prog x xmode) (mem-get prog y ymode))
-          6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
-          7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-          8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-          9 (swap! program adjust-base (mem-get prog x xmode))
-          99 (swap! program assoc :halted? true))))))
+(defn interpret
+  ([prog input] (interpret prog input input))
+  ([prog phase input]
+   (let [{:keys [memory pointer base inputs-received halted? output]} prog]
+     #_(println "pointer: " pointer "phase: " phase "halted?: " halted?
+                "op" (get-op (get memory pointer)) "argmodes" (arg-modes memory pointer))
+     (when-not halted?
+       (let [op (get-op (get memory pointer))
+             [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
+         (case op
+           1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+           2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+           3 (swap! program receive x xmode phase input)
+           4 (swap! program -send (mem-get prog x xmode))
+           5 (swap! program jump-if-true (mem-get prog x xmode) (mem-get prog y ymode))
+           6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
+           7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+           8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+           9 (swap! program adjust-base (mem-get prog x xmode))
+           99 (swap! program assoc :halted? true)))))))
 
-(some
+#_(some
  (fn [program] (when (program :halted?) (program :output)))
  (iterate (fn [program] (interpret program 2 2)) @program))
+
+(defn snd [prog value]
+  (loop [{:keys [memory pointer base inputs-received halted? output]} (interpret prog value)
+         res []]
+    (let [op (get-op (memory pointer))]
+      (cond halted? res
+            (= op 4) (recur (interpret prog value) (conj res (last output)))
+            (= op 3) (recur (interpret prog value) res)
+            :else (recur (interpret prog value) res)))))
+
+(snd @program 2)
+
+;; mult input by repeating cycle and add results, keeping ones digit only for each new element;
+;; that gives you first element of new input array, now for second mult original input again by
+;; repeating cycle, but this time its the second element so make the cycle double each element
+
+;;e.g. cycle is 0 1 0 -1 for first element, then second its 0 0 1 1 0 0 -1 -1 etc.
+;;skip first value of this cycle once per position e.g. above for 2 becomes 0 1 1 0 0 -1 -1 ...
