@@ -5,21 +5,18 @@
             [clojure.java.io :as io]
             [aoc2019-clj.utils.utils :as utils]))
 
-(def input (slurp (io/resource "day9.txt")))
-
-(def program-init-state
-  (-> input (str/split #",")
-      ((partial mapv read-string))))
+(def program (atom {}))
 
 (defn make-program [instructions]
-  (atom {:memory (into {} (map-indexed vector instructions))
-         :pointer 0
-         :base 0
-         :inputs-received 1
-         :halted? false
-         :output []}))
-
-(def program (make-program program-init-state))
+  (swap! program merge
+         {:memory (into {} (map-indexed vector instructions))
+          :pointer 0
+          :base 0
+          :inputs-received 1
+          :halted? false
+          :output []}))
+#_(make-program program-init-state)
+#_(def program (make-program program-init-state))
 
 (defn get-op [op]
   (if (= 99 op)
@@ -74,10 +71,10 @@
                xmode)))
 
 (defn -send [program x]
-  (println x)
+  #_(println x)
   (-> program
       (update :pointer + 2)
-      (update :output conj x)))
+      (assoc :output x)))
 
 (defn jump-if-true [program x y]
   (update program :pointer #(if (not= 0 x) y (+ 3 %))))
@@ -112,6 +109,8 @@
      (when-not halted?
        (let [op (get-op (get memory pointer))
              [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
+         ;; clear output b/w 4's so collecting on non nulls doesn't result in duplicates
+         (if (not= op 4) (swap! program assoc :output nil))
          (case op
            1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
            2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
@@ -126,22 +125,4 @@
 
 #_(some
  (fn [program] (when (program :halted?) (program :output)))
- (iterate (fn [program] (interpret program 2 2)) @program))
-
-(defn snd [prog value]
-  (loop [{:keys [memory pointer base inputs-received halted? output]} (interpret prog value)
-         res []]
-    (let [op (get-op (memory pointer))]
-      (cond halted? res
-            (= op 4) (recur (interpret prog value) (conj res (last output)))
-            (= op 3) (recur (interpret prog value) res)
-            :else (recur (interpret prog value) res)))))
-
-(snd @program 2)
-
-;; mult input by repeating cycle and add results, keeping ones digit only for each new element;
-;; that gives you first element of new input array, now for second mult original input again by
-;; repeating cycle, but this time its the second element so make the cycle double each element
-
-;;e.g. cycle is 0 1 0 -1 for first element, then second its 0 0 1 1 0 0 -1 -1 etc.
-;;skip first value of this cycle once per position e.g. above for 2 becomes 0 1 1 0 0 -1 -1 ...
+ (iterate (fn [program] (interpret program 1)) @program))
