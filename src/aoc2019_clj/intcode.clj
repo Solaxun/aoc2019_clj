@@ -5,18 +5,13 @@
             [clojure.java.io :as io]
             [aoc2019-clj.utils.utils :as utils]))
 
-(def program (atom {}))
-
-(defn make-program [instructions]
-  (swap! program merge
-         {:memory (into {} (map-indexed vector instructions))
-          :pointer 0
-          :base 0
-          :inputs-received 1
-          :halted? false
-          :output []}))
-#_(make-program program-init-state)
-#_(def program (make-program program-init-state))
+(defn make-program [instr]
+  (atom {:memory (into {} (map-indexed vector (map read-string (re-seq #"-*\d+" instr))))
+         :pointer 0
+         :base 0
+         :inputs-received 1
+         :halted? false
+         :output nil}))
 
 (defn get-op [op]
   (if (= 99 op)
@@ -100,29 +95,25 @@
       (update :pointer + 2)
       (update :base + x)))
 
-(defn interpret
-  ([prog input] (interpret prog input input))
-  ([prog phase input]
-   (let [{:keys [memory pointer base inputs-received halted? output]} prog]
-     #_(println "pointer: " pointer "phase: " phase "halted?: " halted?
-                "op" (get-op (get memory pointer)) "argmodes" (arg-modes memory pointer))
-     (when-not halted?
-       (let [op (get-op (get memory pointer))
-             [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
-         ;; clear output b/w 4's so collecting on non nulls doesn't result in duplicates
-         (if (not= op 4) (swap! program assoc :output nil))
-         (case op
-           1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-           2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-           3 (swap! program receive x xmode phase input)
-           4 (swap! program -send (mem-get prog x xmode))
-           5 (swap! program jump-if-true (mem-get prog x xmode) (mem-get prog y ymode))
-           6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
-           7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-           8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
-           9 (swap! program adjust-base (mem-get prog x xmode))
-           99 (swap! program assoc :halted? true)))))))
-
-#_(some
- (fn [program] (when (program :halted?) (program :output)))
- (iterate (fn [program] (interpret program 1)) @program))
+(defn make-interpreter [program]
+  (fn [input phase]
+    (let [program (atom program)
+          {:keys [memory pointer base inputs-received halted? output] :as prog} @program]
+      #_(println "pointer: " pointer "phase: " phase "halted?: " halted?
+                 "op" (get-op (get memory pointer)) "argmodes" (arg-modes memory pointer))
+      (when-not halted?
+        (let [op (get-op (get memory pointer))
+              [[x xmode] [y ymode] [z zmode]] (arg-modes memory pointer)]
+          ;; clear output b/w 4's so collecting on non nulls doesn't result in duplicates
+          (if (not= op 4) (swap! program assoc :output nil))
+          (case op
+            1 (swap! program add (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+            2 (swap! program mult (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+            3 (swap! program receive x xmode phase input)
+            4 (swap! program -send (mem-get prog x xmode))
+            5 (swap! program jump-if-true (mem-get prog x xmode) (mem-get prog y ymode))
+            6 (swap! program jump-if-false (mem-get prog x xmode) (mem-get prog y ymode))
+            7 (swap! program store-if-lt (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+            8 (swap! program store-if-eq (mem-get prog x xmode) (mem-get prog y ymode) z zmode)
+            9 (swap! program adjust-base (mem-get prog x xmode))
+            99 (swap! program assoc :halted? true)))))))

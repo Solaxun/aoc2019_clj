@@ -4,10 +4,10 @@
             [clojure.data.json :as json]
             [clojure.java.io :as io]
             [aoc2019-clj.utils.utils :as utils]
-            [aoc2019-clj.intcode :refer [interpret make-program get-op] :as intcode]
+            [aoc2019-clj.intcode :refer [make-interpreter make-program get-op] :as intcode]
             [clojure.core.async :refer [go >! <! >!! <!! chan alts! alts!!]]))
 
-(def instructions (->>  "day13.txt" io/resource slurp (re-seq #"-*\d+") (mapv read-string)))
+(def instructions (->>  "day13.txt" io/resource slurp))
 (def program (make-program instructions))
 
 (defn draw [tile]
@@ -93,7 +93,8 @@
 ;;;; next two defs are re-def'd from above to stop and wait
 ;;;; for inputs, not just stop on halt
 (defn get-output [p]
-  (if (:halted? (first p)) (println "fuck you" (rest p))) ;; rest is not nil, but CONTAINS nil.  This is the problem
+  ;; rest is not nil, but CONTAINS nil.  This is the problem
+  (if (:halted? (first p)) (println "meh" (rest p)))
   (some (fn [p]
           (cond (:halted? p) [:halted p]
                 (= (get-op (get-in p [:memory (:pointer p)])) 3) [:feed-me p]
@@ -104,27 +105,33 @@
         (rest p)))
 
 (defn collect [program input]
+  (println input)
+  ;;collect called one last time after halt, so catch it here
   (when-not (:halted? program)
-    (let [p (iterate #(interpret % input) program) ;; here is problem final call to collect when halted
+    (let [p (iterate #((make-interpreter %) input input) program)
           [out newp] (get-output p)]
-      (if (= out :halted) (println "FUFJKL"))
+      (if (= out :halted) (println "huh"))
       (when (and (some? out) (not= out :halted) (not= out :feed-me))
-        (lazy-seq (cons out (collect newp input)))))))
+        (lazy-seq (cons [newp out] (collect newp input)))))))
 
 ;; realize this lazy seq now w/ output->tiles or later on program atom
 ;; will have changed underneath it!
-(def start-state (outputs->tiles (collect program nil)))
+(def start-state (outputs->tiles (collect @program1 nil)))
 
 ;; now reset program after collecting start state so subsequent calls to
 ;; collect have a fresh copy of program to swap
-(def program (make-program (assoc instructions 0 2)))
+(def program2 (swap! (make-program instructions) assoc-in [:memory 0] 2))
 
-(loop [game-state start-state]
-  (when-let [moves (collect @intcode/program (move-joystick game-state))]
-    (if (= (last moves) 12338) (println "done" (:halted? @intcode/program)))
-    (recur (advance-game game-state moves))))
+(loop [game-state start-state
+       state-seq (collect program2 (move-joystick game-state))]
+  (let [newp (first (last state-seq))
+        moves (map last state-seq)]
+    (println moves newp)
+    (when moves
+      #_(-> game-state game-board display-game)
+      (if (= (last moves) 12338) (println "done" program))
+      (recur (advance-game game-state moves)
+             (collect newp (move-joystick game-state))))))
 
 (println @score)
-(rest (iterate #(interpret %  @intcode/program) nil))
-(first (iterate #(interpret %  @intcode/program) nil))
-;; finally - calling iterate with nil on the last call
+;;(map last (take 10 (collect program2 -1)))

@@ -7,7 +7,7 @@
             [aoc2019-clj.intcode :refer [interpret make-program get-op] :as intcode]
             [clojure.core.async :refer [go >! <! >!! <!! chan alts! alts!!]]))
 
-(def instructions (->>  "day15.txt" io/resource slurp (re-seq #"-*\d+") (mapv read-string)))
+(def instructions (->>  "day15.txt" io/resource slurp))
 (def program (make-program instructions))
 ;;inputs 1-4 nswe
 ;;outputs 0-2 wall, moved 1 step in dir,moved and now at oxygen
@@ -23,7 +23,7 @@
 
 (defn collect [program input]
   (when-not (:halted? program)
-    (let [p (iterate #(interpret % input) program)
+    (let [p (iterate #((make-interpreter program) % %) program)
           [out newp] (when (get-output p) (get-output p))]
       (when (not= out :halted)
         (lazy-seq (cons out (collect newp input)))))))
